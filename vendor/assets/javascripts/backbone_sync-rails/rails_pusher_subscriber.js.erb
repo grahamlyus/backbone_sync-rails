@@ -1,47 +1,58 @@
 this.BackboneSync = this.BackboneSync || {};
 
 BackboneSync.RailsPusherSubscriber = (function() {
-  function RailsPusherSubscriber(collection, options) {
-    this.collection = collection;
+  function RailsPusherSubscriber(collectionOrModel, options) {
+    var url = _.isFunction(collectionOrModel.url) ? collectionOrModel.url() : collectionOrModel.url;
+    url = url.replace('/', '');
+    this.collectionOrModel = collectionOrModel;
     this.client = options.client;
-    this.channel = options.channel;
+    this.channel = "presence-sync-" + url;
+    this.isCollection = collectionOrModel.models !== undefined
+    if (!this.isCollection) {
+      this.channel = this.channel + '-' + this.collectionOrModel.id;
+    }
     this.subscribe();
   }
 
   RailsPusherSubscriber.prototype.subscribe = function() {
     var self = this;
-    var subchannel = "sync-" + this.channel;
-    this.pusherChannel = this.client.subscribe(subchannel);
+    this.pusherChannel = this.client.subscribe(this.channel);
 
     this.pusherChannel.bind('update', function (data) { self.update(data); });
-    this.pusherChannel.bind('create', function (data) { self.create(data); });
-    this.pusherChannel.bind('destroy', function (data) { self.destroy(data); });
+    if (this.isCollection) {
+      this.pusherChannel.bind('create', function (data) { self.create(data); });
+      this.pusherChannel.bind('destroy', function (data) { self.destroy(data); });
+    }
   };
 
   RailsPusherSubscriber.prototype.update = function(params) {
     var self = this;
-    return $.each(params, function(id, attributes) {
-      var model = self.collection.get(id);
-      if (model) {
-        return model.set(attributes);
-      }
-    });
+    if (this.isCollection) {
+      return $.each(params, function(id, attributes) {
+        var model = self.collectionOrModel.get(id);
+        if (model) {
+          return model.set(attributes);
+        }
+      });
+    } else {
+      this.collectionOrModel.set(params[this.collectionOrModel.id]);
+    }
   };
 
   RailsPusherSubscriber.prototype.create = function(params) {
     var self = this;
     return $.each(params, function(id, attributes) {
-      var model = new self.collection.model(attributes);
-      return self.collection.add(model);
+      var model = new self.collectionOrModel.model(attributes);
+      return self.collectionOrModel.add(model);
     });
   };
 
   RailsPusherSubscriber.prototype.destroy = function(params) {
     var self = this;
     return $.each(params, function(id, attributes) {
-      var model = self.collection.get(id);
+      var model = self.collectionOrModel.get(id);
       if (model) {
-        return self.collection.remove(model);
+        return self.collectionOrModel.remove(model);
       }
     });
   };
