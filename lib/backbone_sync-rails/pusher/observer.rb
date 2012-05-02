@@ -5,6 +5,9 @@ module BackboneSync
     module Pusher
       module Observer
         def after_update(model)
+          accessible_attributes = model.class.accessible_attributes.to_a
+          changed_attributes = model.changes.keys.select {|i|accessible_attributes.include?(i)}
+          return if changed_attributes.empty?
           begin
             BackboneSync::Rails::Pusher::Event.new(model, :update).broadcast
           rescue *NET_HTTP_EXCEPTIONS => e
