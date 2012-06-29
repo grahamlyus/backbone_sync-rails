@@ -8,6 +8,7 @@ module BackboneSync
           accessible_attributes = model.class.accessible_attributes.to_a
           changed_attributes = model.changes.keys.select {|i|accessible_attributes.include?(i)}
           return if changed_attributes.empty?
+          ::Rails.logger.debug("BROADCASTING update of changes: #{model.class.name}[#{model.id}] -> #{model.changes}")
           begin
             BackboneSync::Rails::Pusher::Event.new(model, :update).broadcast
           rescue *NET_HTTP_EXCEPTIONS => e
